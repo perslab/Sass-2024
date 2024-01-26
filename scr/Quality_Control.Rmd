@@ -1,0 +1,12 @@
+---
+title: "Quality_Control"
+author: "Jenny M.Brown"
+date: "26/01/2024"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
