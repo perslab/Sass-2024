@@ -8,5 +8,178 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+## Load Libraries
+```{r, message=F}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(scater)
+library(tibble)
+library(cowplot)
+library(ggplot2)
+library(doMC)
+registerDoMC(20)
+library(dplyr)
+library(scran)
+library(Matrix)
+library(SeuratObject)
+library(SingleCellExperiment)
+library(qs)
+library(CellAnnotatoR)
+library(conos)
+library("scDblFinder")
+```
+## Load Function
+```{r}
+source("/projects/nvg559/rike_data/Sass_2024/Analysis/process_seurat.R")
+```
+## Load CellBender Data .h5 files from each sequencing run
+```{r, eval=FALSE, message=F}
+SID182557 <-Read10X_h5("/projects/nvg559/rike_data/cell_bender_output/SID182557/SID182557_filtered.h5", use.names = TRUE)
+colnames(SID182557) <- gsub("-[1-9]", "", colnames(SID182557)) 
+SID182558 <-Read10X_h5("/projects/nvg559/rike_data/cell_bender_output/SID182558/SID182558_filtered.h5", use.names = TRUE)
+colnames(SID182558) <- gsub("-[1-9]", "", colnames(SID182558)) 
+SID182559 <-Read10X_h5("/projects/nvg559/rike_data/cell_bender_output/SID182559/SID182559_filtered.h5", use.names = TRUE)
+colnames(SID182559) <- gsub("-[1-9]", "", colnames(SID182559)) 
+SID182560 <-Read10X_h5("/projects/nvg559/rike_data/cell_bender_output/SID182560/SID182560_filtered.h5", use.names = TRUE)
+colnames(SID182560) <- gsub("-[1-9]", "", colnames(SID182560)) 
+SID182561 <-Read10X_h5("/projects/nvg559/rike_data/cell_bender_output/SID182561/SID182561_filtered.h5", use.names = TRUE)
+colnames(SID182561) <- gsub("-[1-9]", "", colnames(SID182561)) 
+SID182562 <-Read10X_h5("/projects/nvg559/rike_data/cell_bender_output/SID182562/SID182562_filtered.h5", use.names = TRUE)
+colnames(SID182562) <- gsub("-[1-9]", "", colnames(SID182562)) 
+```
+## Create Seurat Object from each sequencing run and add sample ID
+```{r, eval=FALSE, message=F}
+SID182557 <-CreateSeuratObject(counts = SID182557, project = "Sample_57", min.features = 1000, min.cells = 10)
+SID182558 <-CreateSeuratObject(counts = SID182558, project = "Sample_58", min.features = 1000, min.cells = 10)
+SID182559 <-CreateSeuratObject(counts = SID182559, project = "Sample_59", min.features = 1000, min.cells = 10)
+SID182560 <-CreateSeuratObject(counts = SID182560, project = "Sample_60", min.features = 1000, min.cells = 10)
+SID182561 <-CreateSeuratObject(counts = SID182561, project = "Sample_61", min.features = 1000, min.cells = 10)
+SID182562 <-CreateSeuratObject(counts = SID182562, project = "Sample_62", min.features = 1000, min.cells = 10)
+```
+## Merge and Save Raw Data
+```{r, eval=FALSE}
+merged_dvc <- merge(SID182557, y= c(SID182558,SID182559,SID182560,SID182561,SID182562))
+```
+## Run scDblFinder 
+```{r, eval=FALSE}
+library(BiocParallel)
+set.seed(123)
+merged_dvc.sce <- as.SingleCellExperiment(merged_dvc, assay = 'RNA')
+merged_dvc.sce <- scDblFinder(merged_dvc.sce, samples = "orig.ident", BPPARAM=MulticoreParam(9))
+merged_dvc[["scdbl"]] <- colData(merged_dvc.sce)$scDblFinder.class
+```
+## Look at scDblFinder numbers
+```{r eval=FALSE}
+table(merged_dvc$scdbl, merged_dvc$orig.ident)
+VlnPlot(merged_dvc, "nCount_RNA", group.by = "scdbl", log=T)
+```
+## Add treatment info.
+```{r eval=FALSE}
+samp <- data.frame(sample=c("Sample_57", "Sample_58", "Sample_59", "Sample_60", "Sample_61", "Sample_62"), treatment=c("Veh","Veh","Veh","344","344","344"))
+j_table_D1 <- left_join(merged_dvc@meta.data %>% rownames_to_column("barcode"), samp, by= c("orig.ident"="sample"))
+merged_dvc <- AddMetaData(merged_dvc, j_table_D1 %>% column_to_rownames("barcode"))
+```
 
-## R Markdown
+## Log normal data to split neurons and nonneuronal cells
+```{r, eval=FALSE}
+merged_dvc<- process_seurat(merged_dvc, method = "log", dims = 30, res = .8)
+```
+## Plot and subset doublets
+```{r, eval=FALSE}
+DimPlot(merged_dvc, group.by = "scdbl")
+DimPlot(merged_dvc, group.by = "orig.ident", shuffle=T)
+merged_dvc<- subset(merged_dvc, subset = scdbl == "singlet")
+```
+## Run cell annitator to label major classes
+```{r, eval=FALSE}
+cm <- merged_dvc@assays$RNA@counts
+cm_norm <- Matrix::t(merged_dvc@assays$RNA@data)
+graph <- merged_dvc@graphs$RNA_snn
+emb <- merged_dvc@reductions$umap@cell.embeddings
+clusters <- setNames(merged_dvc@meta.data$seurat_clusters, rownames(merged_dvc@meta.data))
+marker_path <- "/projects/nvg559/marker_major_class.txt"
+clf_data <- getClassificationData(cm, marker_path)
+ann_by_level <- assignCellsByScores(graph=NULL, clf_data, clusters=clusters)
+```
+
+```{r, eval=FALSE}
+Idents(merged_dvc) <- ann_by_level$annotation$l1
+merged_dvc[["major.class"]] <- merged_dvc@active.ident
+```
+```{r, fig.width=5, eval=FALSE}
+DimPlot(merged_dvc, reduction = "umap", group.by = "major.class", label=T, repel = T)+NoLegend() 
+```
+```{r, fig.width=10, eval=FALSE}
+DimPlot(merged_dvc, reduction = "umap", group.by = "orig.ident", shuffle = T) +DimPlot(merged_dvc, reduction = "umap", group.by = "treatment",shuffle = T)
+```
+
+## Subset neurons for outliar detection and filtering
+```{r eval=FALSE}
+DVC_neuron <- subset(merged_dvc, subset = major.class %in% "Neurons")
+table(DVC_neuron$major.class)
+```
+## Run outliar Analysis DVC Neuronal cells
+```{r, eval=FALSE}
+# Remove outliers
+merged.obj.DVC_neuron.sce <- as.SingleCellExperiment(DVC_neuron, assay = 'RNA')
+sizeFactors(merged.obj.DVC_neuron.sce) <- runif(ncol(merged.obj.DVC_neuron.sce))
+merged.obj.DVC_neuron.sce <- logNormCounts(merged.obj.DVC_neuron.sce)
+dec.hash <- modelGeneVar(merged.obj.DVC_neuron.sce)
+top.hash <- getTopHVGs(dec.hash, n=1000)
+merged.obj.DVC_neuron.sce <- runPCA(merged.obj.DVC_neuron.sce, subset_row=top.hash, ncomponents=50)
+
+merged.obj.DVC_neuron.sce <- addPerCellQC(merged.obj.DVC_neuron.sce)
+batch.vec <- merged.obj.DVC_neuron.sce[['orig.ident']]
+reason <- data.frame(
+  "qc.umi.low" = isOutlier(merged.obj.DVC_neuron.sce$sum, log=TRUE, type="lower", batch = batch.vec, nmads = 5),
+  "qc.umi.high" = isOutlier(merged.obj.DVC_neuron.sce$sum, type="higher", batch = batch.vec, nmads = 5),
+  "qc.nexprs.low" = isOutlier(merged.obj.DVC_neuron.sce$detected, log=TRUE, type="lower", batch = batch.vec, nmads = 5),
+  "qc.nexprs.high" = isOutlier(merged.obj.DVC_neuron.sce$detected, type="higher", batch = batch.vec, nmads = 5)
+) %>%
+  mutate(sum = rowSums(across(where(is.logical))),
+         sum = if_else(sum >= 1, true=T, false=F)) %>%
+  dplyr::pull(sum)
+
+DVC_neuron[['discard']] <- reason
+table(DVC_neuron$discard)
+
+Idents(DVC_neuron) <- 'discard'
+DVC_neuron <- subset(DVC_neuron, idents = FALSE)
+
+
+FALSE  TRUE 
+24578   292 
+```
+
+## Filter DVC Neuronal cells
+```{r, eval=FALSE}
+DVC_neuron[[]] %>% 
+  rownames_to_column("cell") %>% 
+  group_by(orig.ident) %>% 
+  dplyr::mutate(complex = log(nFeature_RNA)/log(nCount_RNA)) %>% 
+  dplyr::mutate(q1_rna = quantile(nCount_RNA,0.01),
+         q99_rna = quantile(nCount_RNA,0.99),
+         q1_comp = quantile(complex,0.01)) %>% 
+  filter(nCount_RNA>q1_rna & nCount_RNA<q99_rna  & complex>q1_comp) -> filtered
+
+DVC_neuron_filt <- subset(DVC_neuron, cells = filtered$cell)
+```
+## Add Mito and Ribo metric filter DVC Neuronal cells
+```{r, eval=FALSE}
+DVC_neuron_filt <- scCustomize::Add_Mito_Ribo_Seurat(seurat_object = DVC_neuron_filt, species = "mouse")
+
+DVC_neuron_final<-subset(x = DVC_neuron_filt, subset = percent_ribo < 1 & percent_mito < 1)
+```
+## Plot % mito and % ribo
+```{r eval=FALSE}
+hist(DVC_neuron_filt$percent_mito, breaks=100)
+sum(DVC_neuron_filt$percent_mito>1)
+hist(DVC_neuron_filt$percent_ribo, breaks=100)
+sum(DVC_neuron_filt$percent_ribo>1)
+```
+## Integrate DVC Neuronal cells
+```{r, eval=FALSE}
+DVC_neuron_final_int<- process_seurat(DVC_neuron_final, method = "integrate", batch="treatment", dims = 30, res = .8)
+```
+
