@@ -1,0 +1,111 @@
+---
+title: "IEG_scDist Analysis"
+author: "Jenny Brown"
+date: "14/12/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Load Libraries
+```{r, eval=FALSE}
+library(emmeans)
+library(forcats)
+library(scDist)
+```
+## Load Data
+```{r}
+dvc <- qs::qread("/projects/nvg559/rike_data/Sass_2024/data/neuron_labeled.qs")
+```
+## Calculate IEG Activity Score
+```{r, eval=FALSE, fig.width=4, fig.height=5}
+activity.gene.sets <- list(IEG = c('Fosb','Npas4','Fos','Junb','Nr4a1','Arc','Egr2','Egr1','Maff','Ier2','Klf4','Dusp1','Gadd45g','Dusp5','Btg2','Ppp1r15a','Amigo3'))
+
+dvc <- AddModuleScore(dvc, features = activity.gene.sets, assay = "RNA")
+
+mods <- 
+  dvc[[]] %>% 
+  mutate(gene = Cluster1) %>% 
+  group_by(orig.ident, treatment, predicted.id) %>% 
+  dplyr::summarise(mean = mean(gene), n=n()) %>%
+  group_by(predicted.id) %>% 
+  mutate(tot = sum(n>10)) %>%  arrange(predicted.id) %>% 
+  filter(tot > 4) %>% 
+  lm(mean ~ treatment*predicted.id, data= .)
+
+emm <- emmeans(mods, ~ treatment*predicted.id)
+
+plot <- pairs(emm, simple="treatment", combine=TRUE) %>%  
+  data.frame() %>% 
+  mutate(padj = p.adjust(p.value)) %>% 
+  ggplot() +
+  aes(x=fct_reorder(predicted.id,estimate), y=estimate, color = I(ifelse(padj<0.05, "#F400F4","#7A7A7A"))) +
+  geom_point(position = position_dodge()) +
+  geom_line(position = position_dodge()) +
+  geom_hline(yintercept = 0, linetype="dashed", color="red") +
+  geom_errorbar(aes(ymin = estimate-SE, ymax=estimate+SE), alpha=0.5, width=0.1) +
+  labs(x="", y="IEG score") +
+  ggthemes::theme_tufte() +
+  coord_flip() +
+  theme(text = element_text(family = "Helvetica", size = 7),  
+        axis.title = element_text(family = "Helvetica", size = 7),
+        axis.text = element_text(family = "Helvetica", size = 5)) 
+
+
+plot <- plot + 
+  theme(plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "pt")) 
+
+ggsave(plot = plot, bg = "white", filename = "/projects/nvg559/rike_data/new/plot/IEG_analysis_ordered_final.png",
+      height = 36.5, width = 19, units = "mm", dpi = 400)
+
+pdf(file= "/projects/nvg559/rike_data/IEG_analysis_ordered_final_resized.pdf", height = 2.5, width = 1.48)
+plot
+dev.off()
+
+```
+
+```{r, eval=FALSE}
+DefaultAssay(dvc) <- "RNA"
+ct<- dvc[[]] %>% 
+  mutate(gene = Cluster1) %>% 
+  group_by(orig.ident, treatment, predicted.id) %>% 
+  dplyr::summarise(mean = mean(gene), n=n()) %>%
+  group_by(predicted.id) %>% 
+  mutate(tot = sum(n>10)) %>%  arrange(predicted.id) %>% 
+  filter(tot > 4)
+unique(ct$predicted.id)->keep
+sub<- subset(dvc, subset = predicted.id %in% keep)
+sub <- NormalizeData(sub)
+sub <- FindVariableFeatures(sub, nfeatures = 5000)
+sub_res <- scDist(as.matrix(sub@assays$RNA@data[VariableFeatures(sub),]), sub@meta.data, 
+                                              fixed.effects = "treatment", d = 10, min.counts.per.cell = 20,
+              random.effects=c("orig.ident"),
+              clusters="predicted.id")
+```
+
+```{r, eval=FALSE, fig.height=2.5, fig.width=1.9}
+plot<-sub_res$results %>% 
+  janitor::clean_names() %>% 
+  rownames_to_column("celltype") %>% 
+  ggplot() +
+  aes(fct_reorder(celltype, dist), dist) +
+  geom_point()+
+  geom_errorbar(aes(ymin = x95_percent_ci_low, ymax =  x95_percent_ci_upper)) +
+  ggpubr::theme_pubr() +
+  coord_flip() +
+  labs(x=NULL) +
+  theme(text = element_text(family = "Helvetica", size = 4), 
+        axis.title = element_text(family = "Helvetica", size = 4),
+        axis.text = element_text(family = "Helvetica", size = 4)) 
+
+
+plot <- plot + 
+  theme(plot.margin = margin(t = 0, r =10, b = 0, l = 0, unit = "pt")) 
+
+pdf(file= "/projects/nvg559/rike_data/scDIst_analysis_ordered_final_resized.pdf", height = 2.5, width = 1.26)
+plot
+dev.off()
+```
+
+
