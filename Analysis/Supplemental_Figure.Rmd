@@ -1,0 +1,121 @@
+---
+title: "Supplemental Figure"
+author: "Jenny Brown"
+date: "29/01/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+```{r, Supplemental Fig.}
+genes <- c("Chat","Gad1","Slc17a6","Dkk2","Gal","Glp1r", "Calcr", "Cck", "Lepr")
+# Exclude cells from the Ludwig et al. atlas
+#idx <- which(glia$year == "2023")
+table(dvc$treatment)
+idx<-which(dvc$treatment %in% c("Veh", "344"))
+pal <- rainbow(25)
+for (i in 1:length(genes)) {
+  
+  gene <- genes[i]
+  gene.expr <- data.frame(expression = dvc@assays$RNA@data[gene, idx], 
+                          cell.type = factor(dvc$predicted.id[idx]))
+  
+  if (i == 1) {
+    
+    violin.plot <- ggplot(gene.expr, aes(x=cell.type, y=expression, 
+                                         col = cell.type, fill = cell.type)) + 
+      geom_violin(scale = "width", adjust = 1.5, show.legend = F, 
+                  size = 0.2, color = "black", width = 0.5) +
+      theme_pubr() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(),
+            panel.background = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.3),
+            axis.text.y = element_text(size=6, face="bold"),
+            axis.text.x = element_blank(),
+            axis.title.y = element_text(size=6, face="bold.italic", angle = 360, vjust = 0.5,
+                                         margin=unit(c(0,0,0,0), "cm")),
+            axis.ticks.x = element_blank(),
+            # margin: top, right, bottom, and left
+            plot.margin=unit(c(0.1,0,-.5,0), "cm"),
+            legend.text = element_blank(), 
+            legend.key.height = element_blank(),
+            legend.key.width = element_blank(),
+            legend.margin=element_blank(),
+            legend.box.margin=element_blank()) +
+      xlab("") + ylab(gene) + 
+      scale_fill_manual(values = pal, name = "") + 
+      scale_y_continuous(breaks = c(0, floor(max(gene.expr$expression))))
+  }
+  
+  else if (i != 1 & i < length(genes)) {
+    
+    violin.plot <- ggplot(gene.expr, aes(x=cell.type, y=expression, 
+                                         col = cell.type, fill = cell.type)) + 
+      geom_violin(scale = "width", adjust = 1.5, show.legend = F, 
+                  size = 0.2, color = "black", width = 0.5) +
+      theme_pubr() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(),
+            panel.background = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.3),
+            axis.text.y = element_text(size=6, face="bold"),
+            axis.text.x = element_blank(),
+            axis.title.y = element_text(size=6, face="bold.italic", angle = 360, vjust = 0.5,
+                                         margin=unit(c(0,0,0,0), "cm")),
+            axis.ticks.x = element_blank(),
+            # margin: top, right, bottom, and left
+            plot.margin=unit(c(0.1,0,-.5,0), "cm")) +
+      xlab("") + ylab(gene) + 
+      scale_fill_manual(values = pal) + 
+      scale_y_continuous(breaks = c(0, floor(max(gene.expr$expression))))
+  }
+  
+  else {
+    violin.plot <- ggplot(gene.expr, aes(x=cell.type, y=expression, 
+                                         col = cell.type, fill = cell.type)) + 
+      geom_violin(scale = "width", adjust = 1.5, show.legend = F, 
+                  size = 0.2, color = "black", width = 0.5) +
+      theme_pubr() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(),
+            panel.background = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.3),
+            axis.text.y = element_text(size=6, face="bold"),
+            axis.text.x = element_text(size=6, face="bold", angle=45, hjust=1),
+            axis.title.y = element_text(size=6, face="bold.italic", angle = 360, vjust = 0.5,
+                                         margin=unit(c(0,0,0,0), "cm")),
+            # margin: top, right, bottom, and left
+            plot.margin=unit(c(0.1,0,-.5,0), "cm")) +
+      xlab("") + ylab(gene) + 
+      scale_fill_manual(values = pal) + 
+      scale_y_continuous(breaks = c(0, floor(max(gene.expr$expression))))
+    
+  }
+    assign(paste0("violin.plot", i), violin.plot)
+}
+
+
+
+num_plots <- length(genes)  # Assuming 'genes' has the number of plots you are creating
+
+# Create a vector for relative heights
+# Set 1 for all plots except the 9th, which is set to a value close to 1
+rel_heights <- rep(1, num_plots)
+rel_heights[9] <- 2.5  # Adjust this value as needed (e.g., 0.9 or 1.1)
+
+marker.plot <- cowplot::plot_grid(violin.plot1, violin.plot2, violin.plot3,
+                                       violin.plot4, violin.plot5, violin.plot6,
+                                       violin.plot7, violin.plot8, 
+                                       violin.plot9,  # Add more plots if needed
+                                       align = "v", ncol = 1, 
+                                       rel_heights = rel_heights) 
+
+pdf(file= "/projects/nvg559/rike_data/dvc_neurons_violin.pdf", height = 2.5, width = 4)
+marker.plot
+dev.off()
+```
+

@@ -1,0 +1,107 @@
+---
+title: "Umap Plots"
+author: "Jenny Brown"
+date: "19/01/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(qs)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(ggrepel)
+dvc_label_transfer<- qread("/projects/nvg559/rike_data/Sass_2024/data/neuron_labeled.qs")
+```
+
+###Plot to Make Treatment
+```{r}
+pal<- c("#A61E22","#7A7A7A")
+
+umap.embed.neurons <- as.data.frame(dvc_label_transfer@reductions$umap@cell.embeddings)
+umap.embed.neurons$Treatment <- dvc_label_transfer$treatment
+label <- data.frame(predicted.celltype = unique(dvc_label_transfer$treatment))
+label <- umap.embed.neurons %>% 
+  dplyr::group_by(Treatment) %>% 
+  dplyr::summarize(x = median(UMAP_1), y = median(UMAP_2)) 
+
+umap.embed.neurons <- umap.embed.neurons %>%
+  mutate(Treatment = ifelse(Treatment == "344", "EB1002", Treatment))
+
+set.seed(123)  # Setting a seed for reproducibility
+umap.embed.neurons <- umap.embed.neurons[sample(nrow(umap.embed.neurons)), ]
+
+# Updated Plot with Legend
+umap.plot <- ggplot(data = umap.embed.neurons, mapping = aes(x = UMAP_1, y = UMAP_2, colour = Treatment)) +
+  geom_point(size = 0.4) +
+  theme_pubr() +
+  theme(axis.line = element_blank(), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), 
+        panel.background = element_blank(), 
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank()) +  
+  scale_color_manual(values = pal) +
+  theme(legend.position = "bottom",  # Or "right", "left", "top", as per your preference
+        legend.title = element_text(size=10),
+        legend.text = element_text(size=8),
+        legend.background = element_rect(fill="white", size=2, linetype="solid"),
+        legend.box.background = element_blank()) 
+
+umap.plot <- umap.plot + guides(colour = guide_legend(override.aes = list(size=4)))
+
+# Adjust legend position and change font
+umap.plot <- umap.plot + 
+  theme(legend.position = "bottom",  # Adjust the position as needed
+        legend.margin = margin(t = -20, b = 0, l = -20, r = -20, unit = "pt"),
+        legend.justification = "center",
+        legend.box.just = "bottom",
+        legend.title = element_text(size = 10, family = "Helvetica"),  # Change font size and family
+        legend.text = element_text(size = 10, family = "Helvetica"))   # Change font size and family
+
+umap.plot
+
+pdf(file= "/projects/nvg559/rike_data/dvc_neurons_treatment_umap.pdf", height = 2.5, width = 3)
+umap.plot
+dev.off()
+```
+```{r}
+Pal_1_6<- c( "#653EB3", "#3D0F99", "#967ACC", "#666666", "#CCCCCC", "#A3CC7A", "#999999", "#111111", "#CFE6B8", "#333333","#457500","#0F8299","#85001D","#CCAA7A","#99600F","#E5B7BE","#CC7A88","#B33E52","#78B33E", "#B3823E", "#3E9FB3", "#C7B8E6", "#E6D2B8", "#68B0BF", "#B8DEE6"
+)
+
+umap.embed.neurons <- as.data.frame(dvc_label_transfer@reductions$umap@cell.embeddings)
+umap.embed.neurons$predicted.id <- dvc_label_transfer$predicted.id
+label <- data.frame(predicted.id = unique(dvc_label_transfer$predicted.id))
+label <- umap.embed.neurons %>% 
+  dplyr::group_by(predicted.id) %>% 
+  dplyr::summarize(x = median(UMAP_1), y = median(UMAP_2)) 
+
+
+umap.plot1_6 <- ggplot(data = umap.embed.neurons, mapping = aes(x = UMAP_1, y = UMAP_2, 
+                                                           colour = predicted.id)) +
+  geom_point(size = 0.4) +
+  theme_pubr() +
+  theme(axis.line = element_blank(), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), 
+        panel.background = element_blank(), 
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(), 
+        legend.position = "None",) + 
+  scale_color_manual(values = Pal_1_6) +
+geom_text_repel(data = label, aes(label = predicted.id, x=x, y=y), 
+                  size=3.7, family = "Helvetica", inherit.aes = F) 
+umap.plot1_6
+
+pdf(file= "/projects/nvg559/rike_data/dvc_neuorns_new_pal_predicted_ID_umap.pdf", width = 3, height = 2.5)
+umap.plot1_6
+dev.off
+```
