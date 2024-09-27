@@ -1,1 +1,8 @@
 # Sass-2024
+
+# Title: NK2R control of energy expenditure and feeding to treat metabolic diseases
+
+Abstract: The combination of decreasing food intake and increasing energy expenditure represents a powerful strategy for counteracting cardiometabolic diseases, such as obesity and type 2 diabetes1. Yet current approaches require conjugating multiple receptor agonists to achieve both effects2–4 and, thus far, no safe energy-expending option has reached the clinic. Here we show that activation of Neurokinin 2 Receptor (NK2R) is sufficient to suppress appetite centrally and increase energy expenditure peripherally. We focused on NK2R after discovering its genetic links to obesity and glucose control. However, therapeutically exploiting NK2R signalling has previously been unattainable because its endogenous ligand, Neurokinin A (NKA), is short-lived and lacks receptor specificity5,6. Therefore, we developed selective, long-acting NK2R agonists, with potential for once-weekly administration in humans. In mice, these agonists elicit weight loss by inducing energy expenditure and non-aversive appetite suppression that circumvents canonical leptin signalling. Additionally, a hyperinsulinemic-euglycemic clamp reveals that NK2R agonism acutely enhances insulin sensitization. In diabetic, obese nonhuman primates, NK2R activation significantly decreases body weight, blood glucose, triglycerides, and cholesterol, and ameliorates insulin resistance. These findings identify a single receptor target that leverages both energy-expending and appetite-suppressing programs to improve energy homeostasis and reverse cardiometabolic dysfunction across species.
+
+Single Nucleus RNA-seq Analysis of DVC.
+Data is accessible on GEO; the accession # GSE276735
